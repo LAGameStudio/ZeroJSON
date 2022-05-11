@@ -20,7 +20,7 @@ void output__(const char * fmt, ...) {
  wchar_t* msg = new wchar_t[wchars];
  MultiByteToWideChar(CP_UTF8,0,OUT_buf,-1, msg,wchars);
  MultiByteToWideChar(CP_UTF8,MB_PRECOMPOSED,buf,(int)strlen(OUT_buf),msg,0);
- OutputDebugString(msg);
+ OutputDebugStringW(msg);
  delete[] msg;
 }
 
@@ -2084,6 +2084,9 @@ const char *string_argument( const char *argument, string *arg_first, bool slash
  return argument;
 }
 
+
+
+
 /* Pick off one argument from a string and return the rest.
  * Uses std::string thus dynamic and doesn't use the stack.
  * Understands quotes and {}=[](), treats interim commas and equal signs as space.
@@ -2189,6 +2192,67 @@ const char *string_argument_case( const char *argument, std::string *arg_first )
   if ( *argument == '#' ) while ( *argument != '\n' && *argument != '\r' && *argument != '\0' ) argument++;
   else argument++;
  }
+ return argument;
+}
+
+
+/* Pick off one argument from a string and return the rest without lowering case.
+ * Uses std::string thus dynamic and doesn't use the stack.
+ * Understands quotes and {}=[](), treats interim commas and equal signs as space.
+ */
+const char *string_argument_case( Zstring &sep, const char *argument, std::string *arg_first )
+{
+ char cEnd = ' ';
+ sep = " ";
+// char buf[2];
+ (*arg_first)=string("");
+ if ( argument == null ) return &string_error; // undef behavior? maybe "" is constant
+ while ( _FILLER(*argument) && *argument != '=' ) argument++;
+ // Handle nested {} [] (), or quotes "" '' ``
+ if ( _NESTERS(*argument) || _SEP(*argument) ) { // Delimiters
+  int nests=1;
+  char cStart=*argument;
+  argument++;
+  sep = ""; sep += cStart;
+  switch ( cStart ) {
+   case '{': cEnd = '}'; break;
+   case '[': cEnd = ']'; break;
+   case '(': cEnd = ')'; break;
+   case '\'': cEnd = '\''; break;
+   case '"': cEnd = '"'; break;
+   case '`': cEnd = '`'; break;
+  }
+  while ( *argument != '\0' && nests > 0 ) {
+   if ( *argument == cEnd ) {
+    nests--;
+    if ( nests == 0 ) break;
+   } else if ( *argument == cStart ) nests++;
+   // handle JSON escape characters
+   if (cEnd == '"' && *argument == '\\') {
+	   argument++;
+	   switch (*argument) {
+	   case '\0': break;
+	   case '"':
+	   case '\\': (*arg_first) += (*argument); break;
+	   case 'b': (*arg_first) += '\b';
+	   case 't': (*arg_first) += '\t';
+	   case 'n': (*arg_first) += '\n';
+	   case 'f': (*arg_first) += '\f';
+	   case 'r': (*arg_first) += '\r';
+	   }
+   } else (*arg_first)+=(*argument);
+   if (*argument == '\0') break;
+   argument++;
+  }
+  argument++;
+ } else { // No delimiters, lower case, stop when you hit = , [ { (
+  while ( *argument != '\0' ) {
+   if ( char_in( *argument, "\n\r[{(,= " ) ) break;
+   (*arg_first)+=(*argument);
+   if ( *argument != '\0' ) argument++;
+  }
+ }
+ while ( _FILLER(*argument) && *argument != '=' ) argument++;
  return argument;
 }
 
@@ -2484,6 +2548,26 @@ bool operator== ( const Zstring& a, const char * b ) {
 
 bool operator== ( const char * b, const Zstring& a ) {
  return !str_cmp(a.value.c_str(),b);
+}
+
+bool operator!= ( const Zstring& a, const Zstring& b ) {
+ bool result= !str_cmp(a.value.c_str(),b.value.c_str());
+ if ( !result ) {
+  if ( is_decimal(a.value.c_str()) && is_decimal(b.value.c_str()) ) {
+   double A=atof(a.value.c_str());
+   double B=atof(b.value.c_str());
+   return !( A == B );
+  }
+ }
+ return !result;
+}
+
+bool operator!= ( const Zstring& a, const char * b ) {
+ return str_cmp(a.value.c_str(),b);
+}
+
+bool operator!= ( const char * b, const Zstring& a ) {
+ return str_cmp(a.value.c_str(),b);
 }
 
 string operator+ ( const Zstring& a, const Zstring& b ) {
@@ -4028,4 +4112,44 @@ bool Cartesians::Collides( Cartesians *lines, CoplanarLinesResults &out ) {
  }
  out.SortDistance();
  return (out.count > 0);
+}
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+string file_as_string( const char *filename ) {
+    ifstream input_file(filename);
+    if (!input_file.is_open()) {
+        cerr << "Could not open the file - '"
+             << filename << "'" << endl;
+		return string("");
+    }
+	return string((std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>());
+}
+
+#include <streambuf>
+string file_as_string_streams( const char *filename ) {
+ std::ifstream t(filename);
+ std::string str;
+ t.seekg(0, std::ios::end);   
+ str.reserve((unsigned int) t.tellg());
+ t.seekg(0, std::ios::beg);
+ str.assign((std::istreambuf_iterator<char>(t)),std::istreambuf_iterator<char>());
+ return str;
+}
+
+bool string_as_file(const char *text, const char *fn) {
+    std::ofstream out(fn);
+	if (!out.is_open()) return false;
+    out << text;
+    out.close();
+    return true;
+}
+
+// Tests if a file exists.
+bool file_exists(const char *fn) {
+    std::ifstream f(fn);
+	if (!f.is_open()) return false;
+    f.close();
+    return true;
 }

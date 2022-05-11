@@ -1,15 +1,27 @@
-# ZeroTypesSFL
-Single file library version of the ZeroTypes drop-in library
+# ZeroJSON
 
-Works with C++ 11 to C++ 17 and possibly 19, 20, 21, etc
+ZeroJSON implements a simplified, UTF-8 JSON reader/writer in C++.
 
-This repo has less features than ZeroTypes, but it's all in one file for convenience, portability and minimal footprint.
+# Usage
 
-Differences:
-- More reliance on std::string in Zstring
-- Certain non-core features removed
-- Addition of a Cartesian class that handles 2D rectangles and can also perform complex collision detection
+Include all of the cpp, h and hpp files in your project.
+
+main.cpp:
+```
+#include "ZJSON.hpp"
+
+int main() {
+ InitZeroTypesLibrary();
+ JSON json;
+ json.UnitTests();
+}
+```
+
+# C++ Coverage
+
+Works with C++98 C++11 to C++17 and possibly 19, 20, 21, etc
+
+# Built on ZeroTypesSFL
 
 Original project: http://github.com/h3rb/ZeroTypes
-
 Repo: http://github.com/h3rb/ZeroTypesSFL
